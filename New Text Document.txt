@@ -1,0 +1,118 @@
+if event.propertyName == 'update':
+	event.source.getComponent('Label').text = str(event.newValue)
+	#event.source.fft()
+	from org.apache.commons.math3.transform import FastFourierTransformer
+	from org.apache.commons.math3.transform import DftNormalization
+	from org.apache.commons.math3.transform import TransformType
+	#from org.apache.commons.math3.transform.TransformType import type;
+	from org.apache.commons.math3.analysis.function import Abs
+	import org.apache.commons.math3.analysis.FunctionUtils;
+	import org.apache.commons.math3.analysis.UnivariateFunction;
+	import org.apache.commons.math3.complex.Complex;
+	import org.apache.commons.math3.exception.DimensionMismatchException;
+	import org.apache.commons.math3.exception.MathIllegalArgumentException;
+	import org.apache.commons.math3.exception.MathIllegalStateException;
+	import org.apache.commons.math3.exception.util.LocalizedFormats;
+	import org.apache.commons.math3.util.ArithmeticUtils;
+	import org.apache.commons.math3.util.FastMath;
+	import org.apache.commons.math3.util.MathArrays;
+	from org.apache.commons.math3.complex.Complex import abs;
+	from org.apache.commons.math3.complex.Complex import atan;
+	from org.apache.commons.lang3 import StringUtils;
+	#from org.apache.commons.math3.transform.FastFourierTransformer import Complex
+	import java.lang.Math;
+	
+	# Defining the Input Data
+	#x = [3.5,2.6,1.5,4.9,1,1,1,1,8,13.2,15.6,19.8,23.4,34,9,0.8,5.6,4.5,5.7,7.8,15.6,19.8,23.4,34,9,0.8,5.6,4.5,5.7,7.8,4.3,5]
+	x = []
+	pyDataSet = system.db.runQuery("SELECT TOP(256) t_stamp, temp_c FROM Group_table2 order by t_stamp desc")
+	input_data = system.dataset.toPyDataSet(pyDataSet)
+	for row in input_data:
+	   t_stamp = row[0]
+	   temp = row[1]
+	   x.append(temp)
+#	print("Input Data : " + str(x))
+		
+	# Finding the FFT and IFFT of the input Data
+	fft = FastFourierTransformer(DftNormalization.STANDARD);
+	y  = fft.transform(x, TransformType.FORWARD);
+	ifft = fft.transform(y, TransformType.INVERSE);
+	
+	fft_data = [fft_d for fft_d in y]
+	fft_new = [fft_data]
+#	print("Frequency Transformation of the Input Data : " + str(fft_new))
+	
+	# Inverse Transform
+	ifft_data = [ifft_d for ifft_d in ifft]
+	ifft_new = [ifft_data]
+#	print("Inverse transform of the Input Data : " + str(ifft_new))
+	
+	# Magnitude of the complex array results for both ifft and fft data
+	# Magnitude of the fft array results 
+	fft_abs = [abs(new) for new in fft_data]
+#	print("Magnitude FFT List : " + str(fft_abs))
+	
+	# Phase information
+	fft_phase = [abs(atan(new)) for new in fft_data]
+#	print("Phase List : " + str(fft_phase))
+	
+	# Magnitude of the ifft array results 
+	ifft_abs = [abs(new) for new in ifft_data]
+#	print("Absolute IFFT List : " + str(ifft_abs))
+	
+	header = ['FFT Magnitude','Inverse Transform Magnitude']
+	fft_absolute = [fft_abs]
+	ifft_absolute = [ifft_abs]
+	final_data = [fft_absolute, ifft_absolute]
+	#print("Final Data List : " + str(final_data))
+	
+	# Length of the Input data
+	N = len(fft_abs)
+	
+	# Maximum Frequency of the Signal
+	Fmax = max(fft_abs)
+	Fmin = min(fft_abs)
+	F_length = len(fft_abs)
+	
+	# Nyquist Criterion of a Sampling Frequency to avoid aliasing
+	Fs = 2*Fmax
+	
+	# Sampled Data
+	F_sampled = [round((new/Fs),4) for new in fft_abs]
+	print("Sampled FFT List : " + str(F_sampled))
+	
+	# Frequency Increment, % frequency array spacing (Hz), fft rule
+	df = Fs/N; 
+	
+	# Frequency Array
+	#Freq_array = [0:df:(Fs/2)]
+	freq_array = [] 
+	
+	# range(start,end,step)
+	# range(start,end,step)
+	# [lower + x*(upper-lower)/(length-1) for x in range(length)], equivalent to np.linspace(start, stop, step, endpoint=1)
+	
+	for freq in range(F_length):
+	   freq_arr = Fmin + round((freq * (Fmax - Fmin)/(F_length - 1)),4)
+	#   freq_arr = (freq_list)
+	#for freq in range(0, Fmax, df):
+	   freq_array.append(freq_arr)
+#	print(freq_array)
+#	print(len(freq_array))
+	
+	
+	#F_sampled = [0.5, 0.1631, 0.1105, 0.2035, 0.1036, 0.0357, 0.0757, 0.0763, 0.0137, 0.0646, 0.0659, 0.0229, 0.0398, 0.0558, 0.0136, 0.0073, 0.0394, 0.0073, 0.0136, 0.0558, 0.0398, 0.0229, 0.0659, 0.0646, 0.0137, 0.0763, 0.0757, 0.0357, 0.1036, 0.2035]
+	#freq_array = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250, 260, 270, 280, 290]
+	
+	headers = ['Freq','FFT']
+	rows = []
+	for i in range(len(freq_array)):
+		rows.append([freq_array[i], F_sampled[i]])
+		
+	data = system.dataset.toDataSet(headers, rows)
+	
+	event.source.getComponent('Chart 1').Data = data
+	event.source.getComponent('Power Table').data = data
+#	event.source.update = event.newValue
+	
+	
